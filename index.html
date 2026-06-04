@@ -6,10 +6,8 @@
     <title>ParishConnect | Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         body { font-family: 'Inter', sans-serif; background: #f1f5f9; }
-        .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; z-index: 1000; }
     </style>
 </head>
 <body>
@@ -37,11 +35,16 @@
         const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 
         function redirectWithRole(role) {
-            // Store the role in sessionStorage, then start OAuth flow
             sessionStorage.setItem('parishRole', role);
-            // Use Google's OAuth to get token, then redirect to dashboard
-            const redirectUri = window.location.origin + `/${role}.html`;
-            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${redirectUri}&response_type=token&scope=${SCOPES}&include_granted_scopes=true`;
+            
+            // Build the full redirect URI using the current page's base path
+            const currentPath = window.location.pathname; // e.g., "/ParishConnect/index.html"
+            const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1); // "/ParishConnect/"
+            const redirectUri = window.location.origin + baseDir + role + '.html';
+            
+            console.log("Redirect URI:", redirectUri); // Check the console to verify
+            
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${SCOPES}&include_granted_scopes=true`;
             window.location.href = authUrl;
         }
     </script>
