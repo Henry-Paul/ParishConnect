@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParishConnect | Priest Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #f1f5f9; }
+        .fade-in { animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; z-index: 1000; }
+        .interactive-row:hover { background: #f8fafc; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <!-- Login Screen -->
+    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+            <i data-lucide="church" class="text-amber-400 w-12 h-12 mx-auto mb-4"></i>
+            <h1 class="text-2xl font-bold">Parish Priest Login</h1>
+            <input type="password" id="priest-code" placeholder="Priest Passcode" class="w-full border rounded-lg p-3 my-4">
+            <button onclick="login()" class="w-full bg-amber-500 py-3 rounded-lg font-bold">Access Dashboard</button>
+            <div id="error" class="text-red-600 text-sm mt-2 hidden"></div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="hidden">
+        <div class="flex h-screen">
+            <!-- Sidebar -->
+            <aside class="w-64 bg-slate-900 text-white flex flex-col">
+                <div class="p-6 border-b border-slate-700"><h1 class="text-xl font-bold">ParishConnect</h1><p class="text-xs text-slate-400">Priest Panel</p></div>
+                <nav class="flex-1 p-4 space-y-2">
+                    <button onclick="showSection('overview')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 flex gap-3"><i data-lucide="layout-dashboard"></i> Overview</button>
+                    <button onclick="showSection('directory')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 flex gap-3"><i data-lucide="users"></i> Directory</button>
+                    <button onclick="showSection('financials')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 flex gap-3"><i data-lucide="credit-card"></i> Financials</button>
+                    <button onclick="showSection('graves')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 flex gap-3"><i data-lucide="map-pin"></i> Graves</button>
+                    <button onclick="showSection('requests')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 flex gap-3"><i data-lucide="bell"></i> Requests</button>
+                    <button onclick="showSection('choir')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 flex gap-3"><i data-lucide="music"></i> Choir</button>
+                    <button onclick="showSection('announcements')" class="w-full text-left p-3 rounded-lg hover:bg-slate-800 flex gap-3"><i data-lucide="megaphone"></i> Announcements</button>
+                </nav>
+                <div class="p-4 border-t border-slate-700"><button onclick="logout()" class="text-red-400 flex gap-2 w-full"><i data-lucide="log-out"></i> Logout</button></div>
+            </aside>
+
+            <!-- Main content -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <div id="section-overview" class="hidden"></div>
+                <div id="section-directory" class="hidden"></div>
+                <div id="section-financials" class="hidden"></div>
+                <div id="section-graves" class="hidden"></div>
+                <div id="section-requests" class="hidden"></div>
+                <div id="section-choir" class="hidden"></div>
+                <div id="section-announcements" class="hidden"></div>
+            </main>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const SHEETBEST_SHEET_ID = "1M4AxW0I4fycc5ChT0aoWnTiCKxOmW7i6L24cbQjTwDk";
+        const API_KEY = "FxyhTS7Q6AXZ!%vPedRnjUb9p-1Jjv%oDkrJxXTnvBW_e0cuno5nn#gPyn1cM!Az";
+        const API_BASE = `https://api.sheetbest.com/sheets/${SHEETBEST_SHEET_ID}`;
+
+        const TABS = {
+            FAMILIES:'Families', MEMBERS:'Members', GRAVES:'Graves', PAYMENTS:'Payments',
+            REQUESTS:'ServiceRequests', CHOIR:'ChoirActivities', PASSCODES:'Passcodes', ANNOUNCEMENTS:'Announcements'
+        };
+
+        let state = { data: { families:[], members:[], graves:[], payments:[], requests:[], choir:[], announcements:[] }, activeSection:'overview' };
+
+        function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'),3000); }
+
+        // Authenticated fetch helpers
+        async function fetchTab(tab) {
+            const res = await fetch(`${API_BASE}?tab=${tab}`, { headers: { 'X-Api-Key': API_KEY } });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        }
+        async function appendRow(tab, data) {
+            const res = await fetch(`${API_BASE}?tab=${tab}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) throw new Error(`Append failed`);
+            return res.json();
+        }
+        async function updateRow(tab, rowId, data) {
+            const res = await fetch(`${API_BASE}?tab=${tab}&rowId=${rowId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) throw new Error(`Update failed`);
+            return res.json();
+        }
+        async function deleteRow(tab, rowId) {
+            const res = await fetch(`${API_BASE}?tab=${tab}&rowId=${rowId}`, {
+                method: 'DELETE',
+                headers: { 'X-Api-Key': API_KEY }
+            });
+            if (!res.ok) throw new Error(`Delete failed`);
+            return res.json();
+        }
+
+        async function loadData() {
+            const [families, members, graves, payments, requests, choir, announcements] = await Promise.all([
+                fetchTab(TABS.FAMILIES), fetchTab(TABS.MEMBERS), fetchTab(TABS.GRAVES), fetchTab(TABS.PAYMENTS),
+                fetchTab(TABS.REQUESTS), fetchTab(TABS.CHOIR), fetchTab(TABS.ANNOUNCEMENTS)
+            ]);
+            state.data = {
+                families: families.map(f=>({...f,id:Number(f.id)})),
+                members: members.map(m=>({...m,id:Number(m.id),familyId:Number(m.familyId),isDeceased:m.isDeceased==='True',isEarning:m.isEarning==='True',sacraments:JSON.parse(m.sacraments||'{}'),catechism:JSON.parse(m.catechism||'[]'),choir:JSON.parse(m.choir||'{"active":false,"roles":[]}')})),
+                graves: graves.map(g=>({...g,familyId:Number(g.familyId),buriedMemberIds:JSON.parse(g.buriedMemberIds||'[]')})),
+                payments: payments.map(p=>({...p,familyId:Number(p.familyId),year:Number(p.year),months:JSON.parse(p.months||'{}')})),
+                requests: requests.map(r=>({...r,id:Number(r.id),familyId:Number(r.familyId),data:JSON.parse(r.data||'{}')})),
+                choir, announcements: announcements.sort((a,b)=>new Date(b.date)-new Date(a.date))
+            };
+        }
+
+        async function login() {
+            const code = document.getElementById('priest-code').value.trim();
+            if(!code) return;
+            try {
+                const passcodes = await fetchTab(TABS.PASSCODES);
+                if(!passcodes.find(p=>p.role==='priest' && p.code===code)) throw new Error('Invalid code');
+                await loadData();
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                showSection('overview');
+                lucide.createIcons();
+            } catch(e) { document.getElementById('error').innerText='Invalid passcode'; document.getElementById('error').classList.remove('hidden'); }
+        }
+        function logout() { location.reload(); }
+
+        function showSection(section) {
+            state.activeSection = section;
+            ['overview','directory','financials','graves','requests','choir','announcements'].forEach(s => document.getElementById(`section-${s}`).classList.add('hidden'));
+            document.getElementById(`section-${section}`).classList.remove('hidden');
+            if(section==='overview') renderOverview();
+            if(section==='directory') renderDirectory();
+            if(section==='financials') renderFinancials();
+            if(section==='graves') renderGraves();
+            if(section==='requests') renderRequests();
+            if(section==='choir') renderChoir();
+            if(section==='announcements') renderAnnouncements();
+            lucide.createIcons();
+        }
+
+        function renderOverview() {
+            const container = document.getElementById('section-overview');
+            const totalFamilies = state.data.families.length;
+            const totalMembers = state.data.members.length;
+            const activeMembers = state.data.members.filter(m=>!m.isDeceased).length;
+            const pendingReqs = state.data.requests.filter(r=>r.status==='Pending').length;
+            container.innerHTML = `<div class="fade-in"><h1 class="text-3xl font-bold mb-6">Priest Dashboard</h1><div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"><div class="bg-white p-6 rounded-2xl shadow"><p class="text-slate-500">Families</p><p class="text-3xl font-black">${totalFamilies}</p></div><div class="bg-white p-6 rounded-2xl shadow"><p class="text-slate-500">Members</p><p class="text-3xl font-black">${totalMembers}</p></div><div class="bg-white p-6 rounded-2xl shadow"><p class="text-slate-500">Active</p><p class="text-3xl font-black text-emerald-600">${activeMembers}</p></div><div class="bg-white p-6 rounded-2xl shadow"><p class="text-slate-500">Pending Req.</p><p class="text-3xl font-black text-amber-600">${pendingReqs}</p></div></div><div class="bg-white rounded-2xl shadow p-6"><h2 class="font-bold text-xl mb-4">Latest Announcements</h2><div id="preview-announce" class="space-y-3"></div></div>`;
+            const previewDiv = container.querySelector('#preview-announce');
+            if(previewDiv) previewDiv.innerHTML = state.data.announcements.slice(0,3).map(a=>`<div class="p-3 bg-slate-50 rounded-lg"><span class="text-xs font-bold ${a.type==='Urgent'?'text-red-600':'text-amber-600'}">${a.type}</span><p class="font-medium">${a.title}</p><p class="text-xs text-slate-400">${new Date(a.date).toLocaleString()}</p></div>`).join('');
+        }
+
+        function renderDirectory() {
+            const container = document.getElementById('section-directory');
+            container.innerHTML = `<div><h2 class="text-2xl font-bold mb-4">Parish Directory</h2><div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5">${state.data.families.map(f=>`<div onclick="viewFamily(${f.id})" class="bg-white p-5 rounded-2xl shadow cursor-pointer hover:shadow-md"><p class="text-xs text-amber-600 font-bold">${f.cardNo}</p><h3 class="font-bold text-lg">${f.name}</h3><p class="text-sm text-slate-500">${f.address}</p></div>`).join('')}</div></div>`;
+        }
+        function viewFamily(id) { window.location.href=`family.html?familyId=${id}`; }
+
+        function renderFinancials() {
+            const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const container = document.getElementById('section-financials');
+            container.innerHTML = `<div><h2 class="text-2xl font-bold mb-4">2026 Contributions</h2><div class="overflow-x-auto"><table class="w-full bg-white rounded-2xl"><thead><tr class="bg-slate-900 text-white"><th class="p-4">Family</th>${months.map(m=>`<th class="p-4 text-center">${m}</th>`).join('')}</tr></thead><tbody>${state.data.families.map(f=>{const p=state.data.payments.find(p=>p.familyId===f.id&&p.year===2026)||{months:{}};return `<tr><td class="p-4 font-bold">${f.name}</td>${months.map(m=>`<td class="p-4 text-center"><button onclick="togglePayment(${f.id},'${m}')" class="p-2 rounded-full ${p.months[m]?'bg-emerald-100 text-emerald-600':'bg-slate-100 text-slate-400'}"><i data-lucide="${p.months[m]?'check-circle':'circle'}"></i></button></td>`).join('')}</tr>`}).join('')}</tbody></table></div></div>`;
+        }
+
+        async function togglePayment(familyId, month) {
+            let payment = state.data.payments.find(p=>p.familyId===familyId && p.year===2026);
+            let months = payment ? {...payment.months} : {};
+            months[month] = !months[month];
+            if(payment) await updateRow(TABS.PAYMENTS, payment._rowId, {familyId, year:2026, months:JSON.stringify(months)});
+            else await appendRow(TABS.PAYMENTS, {familyId, year:2026, months:JSON.stringify(months)});
+            await loadData(); showSection('financials');
+        }
+
+        function renderGraves() {
+            const container = document.getElementById('section-graves');
+            container.innerHTML = `<div><h2 class="text-2xl font-bold mb-4">Graveyard Map</h2><div class="grid md:grid-cols-3 gap-6">${state.data.graves.map(g=>{const f=state.data.families.find(f=>f.id===g.familyId);return `<div class="bg-white rounded-2xl shadow p-5"><p class="text-xs text-slate-500">Grave No.</p><p class="text-2xl font-black">${g.graveNo}</p><p class="mt-2">Family: ${f?.name||'Unknown'}</p></div>`}).join('')}</div></div>`;
+        }
+
+        function renderRequests() {
+            const container = document.getElementById('section-requests');
+            container.innerHTML = `<div><h2 class="text-2xl font-bold mb-4">Service Requests</h2><div class="space-y-4">${state.data.requests.map(r=>{const f=state.data.families.find(f=>f.id===r.familyId);return `<div class="bg-white rounded-2xl shadow p-6"><div class="flex justify-between"><div><span class="text-xs text-slate-500">${r.type} • ${r.submittedAt}</span><h3 class="font-bold">${f?.name}</h3><pre class="text-sm bg-slate-50 p-3 rounded mt-2">${JSON.stringify(r.data,null,2)}</pre></div>${r.status==='Pending'?`<div class="flex gap-2"><button onclick="updateRequestStatus(${r.id},'Rejected')" class="px-4 py-2 bg-red-100 text-red-700 rounded">Reject</button><button onclick="updateRequestStatus(${r.id},'Approved')" class="px-4 py-2 bg-green-600 text-white rounded">Approve</button></div>`:`<span class="px-3 py-1 rounded-full ${r.status==='Approved'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${r.status}</span>`}</div></div>`}).join('')}</div></div>`;
+        }
+
+        async function updateRequestStatus(id, newStatus) {
+            const req = state.data.requests.find(r=>r.id===id);
+            if(!req) return;
+            await updateRow(TABS.REQUESTS, req._rowId, {...req, status: newStatus});
+            if(newStatus==='Approved') {
+                if(req.type==='Baptism') {
+                    const newId = Math.max(...state.data.members.map(m=>m.id),0)+1;
+                    await appendRow(TABS.MEMBERS, {id:newId, familyId:req.familyId, name:req.data.childName, relation:'Child', dob:req.data.dob, isDeceased:'False', isEarning:'False', sacraments:JSON.stringify({baptism:req.data.preferredDate}), catechism:'[]', scholarship:'', choir:'{"active":false,"roles":[]}'});
+                } else if(req.type==='Marriage' && req.memberId) {
+                    const member = state.data.members.find(m=>m.id===req.memberId);
+                    if(member) {
+                        let sacraments = member.sacraments || {};
+                        sacraments.marriage = {date:req.data.preferredDate, to:req.data.fianceName};
+                        await updateRow(TABS.MEMBERS, member._rowId, {...member, sacraments:JSON.stringify(sacraments)});
+                    }
+                } else if(req.type==='DeceasedUpdate' && req.memberId) {
+                    const member = state.data.members.find(m=>m.id===req.memberId);
+                    if(member) await updateRow(TABS.MEMBERS, member._rowId, {...member, isDeceased:'True'});
+                }
+            }
+            await loadData(); renderRequests();
+        }
+
+        function renderChoir() {
+            const choirMembers = state.data.members.filter(m=>m.choir?.active && !m.isDeceased);
+            const container = document.getElementById('section-choir');
+            container.innerHTML = `<div><h2 class="text-2xl font-bold mb-4">Choir Ministry</h2><div class="grid md:grid-cols-2 gap-5">${choirMembers.map(m=>`<div class="bg-white rounded-2xl shadow p-5 flex justify-between items-center"><div><h3 class="font-bold">${m.name}</h3><div class="flex gap-1 mt-1">${(m.choir.roles||[]).map(r=>`<span class="text-xs bg-indigo-100 px-2 py-1 rounded">${r}</span>`).join('')}</div></div><button onclick="editChoir(${m.id})" class="text-indigo-600"><i data-lucide="edit-3"></i></button></div>`).join('')}</div></div>`;
+        }
+        async function editChoir(id) { 
+            const member = state.data.members.find(m=>m.id===id);
+            if(!member) return;
+            let roles = member.choir?.roles || [];
+            let newRoles = prompt('Enter roles (comma separated: Singer, Guitarist, Pianist, Drummer)', roles.join(','));
+            if(newRoles !== null) {
+                const roleArray = newRoles.split(',').map(r=>r.trim()).filter(r=>r);
+                await updateRow(TABS.MEMBERS, member._rowId, {...member, choir:JSON.stringify({active:roleArray.length>0, roles:roleArray})});
+                await loadData(); renderChoir();
+                showToast('Choir skills updated');
+            }
+        }
+
+        function renderAnnouncements() {
+            const typeColors = { General:'bg-blue-100 text-blue-800', Mass:'bg-purple-100 text-purple-800', Event:'bg-green-100 text-green-800', Urgent:'bg-red-100 text-red-800' };
+            const container = document.getElementById('section-announcements');
+            container.innerHTML = `<div><div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold">📢 Announcements</h2><button onclick="openAnnouncementModal()" class="bg-amber-500 px-4 py-2 rounded-lg font-bold">+ New</button></div><div class="space-y-6">${state.data.announcements.map(a=>`<div class="bg-white rounded-2xl shadow border-l-8 ${a.type==='Urgent'?'border-red-500':'border-amber-400'} p-6"><div class="flex justify-between"><div><span class="inline-block px-3 py-1 rounded-full text-xs font-bold ${typeColors[a.type]}">${a.type}</span><h3 class="text-xl font-bold mt-2">${escapeHtml(a.title)}</h3></div><div class="text-sm text-slate-400">${new Date(a.date).toLocaleString()}</div></div><p class="mt-3 text-slate-600">${escapeHtml(a.content)}</p><div class="mt-4 text-xs text-slate-400 flex justify-between"><span>Posted by ${a.createdBy||'Priest'}</span><button onclick="deleteAnnouncement('${a._rowId}')" class="text-red-500">Delete</button></div></div>`).join('')}</div></div>`;
+        }
+        function openAnnouncementModal() {
+            let title = prompt('Announcement Title');
+            if(!title) return;
+            let content = prompt('Message');
+            if(!content) return;
+            let type = prompt('Type (General/Mass/Event/Urgent)', 'General');
+            publishAnnouncement(title, content, type);
+        }
+        async function publishAnnouncement(title, content, type) {
+            await appendRow(TABS.ANNOUNCEMENTS, {
+                title, content,
+                date: new Date().toISOString(),
+                type,
+                createdBy: 'Priest',
+                createdAt: new Date().toISOString()
+            });
+            await loadData();
+            renderAnnouncements();
+            showToast('Announcement published');
+        }
+        async function deleteAnnouncement(rowId) {
+            if(confirm('Delete this announcement?')) {
+                await deleteRow(TABS.ANNOUNCEMENTS, rowId);
+                await loadData();
+                renderAnnouncements();
+                showToast('Deleted');
+            }
+        }
+        function escapeHtml(str) { return str.replace(/[&<>]/g, function(m){if(m==='&')return '&amp;';if(m==='<')return '&lt;';if(m==='>')return '&gt;';return m;}); }
+
+        // Expose globals
+        window.login=login; window.logout=logout; window.showSection=showSection; window.viewFamily=viewFamily;
+        window.togglePayment=togglePayment; window.updateRequestStatus=updateRequestStatus; window.editChoir=editChoir;
+        window.publishAnnouncement=publishAnnouncement; window.deleteAnnouncement=deleteAnnouncement;
+        window.openAnnouncementModal=openAnnouncementModal;
+    </script>
+</body>
+</html>
