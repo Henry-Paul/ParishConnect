@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParishConnect | Family</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-100">
+    <div id="app"></div>
+    <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white px-4 py-2 rounded-lg hidden"></div>
+
+    <script>
+        const SPREADSHEET_ID = "1zP7AE3JXEyVw0RRPHdD9Pj-HTdxtswAHzQhkAttxIsQ";
+        const CLIENT_ID = "706990173660-1ar56n5c3hrvhlabkki9irkng65vpv2p.apps.googleusercontent.com";
+        let accessToken = null;
+        let state = { family: null, members: [], payments: {}, graves: [], announcements: [] };
+
+        function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'),3000); }
+
+        async function getSheetData(sheet) {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheet}?alt=json`;
+            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            const data = await res.json();
+            if (!data.values) return [];
+            const headers = data.values[0];
+            return data.values.slice(1).map(row => {
+                let obj = {};
+                headers.forEach((h,i) => obj[h] = row[i] || '');
+                return obj;
+            });
+        }
+
+        async function appendRow(sheet, rowData) {
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheet}!A:Z:append?valueInputOption=RAW`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: [Object.values(rowData)] })
+            });
+            if (!res.ok) throw new Error();
+            return res.json();
+        }
+
+        async function loadData(familyId) {
+            const [families, members, payments, graves, announcements] = await Promise.all([
+                getSheetData('Families'), getSheetData('Members'), getSheetData('Payments'), getSheetData('Graves'), getSheetData('Announcements')
+            ]);
+            state.family = families.find(f => Number(f.id) === familyId);
+            state.members = members.filter(m => Number(m.familyId) === familyId).map(m => ({ ...m, id: Number(m.id) }));
+            state.payments = payments.find(p => Number(p.familyId) === familyId && Number(p.year) === 2026) || { months: {} };
+            state.graves = graves.filter(g => Number(g.familyId) === familyId);
+            state.announcements = announcements.sort((a,b)=>new Date(b.date)-new Date(a.date));
+        }
+
+        async function initOAuth() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const familyId = urlParams.get('familyId');
+            if (!familyId) { window.location.href = 'index.html'; return; }
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const token = params.get('access_token');
+            if (token) {
+                accessToken = token;
+                window.history.replaceState({}, document.title, window.location.pathname);
+                await loadData(Number(familyId));
+                renderDashboard();
+            } else {
+                // Redirect to index for login
+                window.location.href = 'index.html';
+            }
+        }
+
+        function renderDashboard() {
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            document.getElementById('app').innerHTML = `
+                <div class="bg-white shadow p-4 flex justify-between">
+                    <h1 class="text-xl font-bold">${state.family.name}</h1>
+                    <button onclick="logout()" class="text-red-500">Logout</button>
+                </div>
+                <main class="p-6 max-w-4xl mx-auto space-y-6">
+                    <div class="bg-white rounded-2xl shadow p-6"><h2 class="text-2xl font-bold">Family Details</h2><p>${state.family.address}</p><p>${state.family.phone}</p><button onclick="editFamily()" class="mt-4 bg-slate-100 px-4 py-2 rounded">Edit Info</button></div>
+                    <div class="bg-white rounded-2xl shadow p-6"><h3 class="font-bold text-xl mb-4">Members</h3><table class="w-full"><tbody>${state.members.map(m => `<tr class="border-b"><td class="py-3 font-medium">${m.name}</td><td>${m.relation}</td><td class="text-right"><span class="px-2 py-1 text-xs rounded-full ${m.isDeceased==='TRUE'?'bg-red-100 text-red-700':'bg-green-100 text-green-700'}">${m.isDeceased==='TRUE'?'Deceased':'Alive'}</span></td></tr>`).join('')}</tbody></table></div>
+                    <div class="bg-white rounded-2xl shadow p-6"><h3 class="font-bold text-xl mb-4">2026 Contributions</h3><div class="grid grid-cols-4 gap-2">${months.map(m => `<div class="p-3 text-center rounded-xl border ${state.payments.months[m]?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-white border-slate-200'}">${m}</div>`).join('')}</div></div>
+                    <div class="bg-white rounded-2xl shadow p-6"><h3 class="font-bold text-xl mb-4">Grave Allocation</h3><div>${state.graves.map(g => `<p><strong>${g.graveNo}</strong> – ${g.buriedMemberIds?.length||0} buried</p>`).join('')||'None'}</div></div>
+                    <div class="flex gap-4"><button onclick="openBaptismModal()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold">Book Baptism</button><button onclick="openMarriageModal()" class="bg-rose-600 text-white px-6 py-3 rounded-xl font-bold">Apply Marriage</button></div>
+                    <div class="bg-white rounded-2xl shadow p-6"><h3 class="font-bold text-xl mb-2">📢 Announcements</h3><div class="space-y-4">${state.announcements.map(a=>`<div class="border-l-4 border-amber-500 p-2"><div class="font-bold">${a.title}</div><div class="text-xs text-slate-400">${new Date(a.date).toLocaleString()}</div><p>${a.content}</p></div>`).join('')}</div></div>
+                </main>
+            `;
+            lucide.createIcons();
+        }
+
+        async function editFamily() {
+            let addr = prompt('New address', state.family.address);
+            let phone = prompt('New phone', state.family.phone);
+            if (addr || phone) {
+                // Update the family row
+                const families = await getSheetData('Families');
+                const idx = families.findIndex(f => Number(f.id) === state.family.id);
+                if (idx !== -1) {
+                    const updated = { ...state.family, address: addr || state.family.address, phone: phone || state.family.phone };
+                    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/Families!A${idx+2}:Z${idx+2}?valueInputOption=RAW`;
+                    await fetch(url, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ values: [Object.values(updated)] })
+                    });
+                    showToast('Family updated');
+                    location.reload();
+                }
+            }
+        }
+
+        function openBaptismModal() {
+            let child = prompt('Child\'s name');
+            if (!child) return;
+            let dob = prompt('Date of birth (YYYY-MM-DD)');
+            if (!dob) return;
+            let date = prompt('Preferred baptism date (YYYY-MM-DD)');
+            if (!date) return;
+            submitRequest('Baptism', { childName: child, dob, preferredDate: date });
+        }
+
+        function openMarriageModal() {
+            let fiance = prompt('Fiancé(e) full name');
+            if (!fiance) return;
+            let date = prompt('Preferred wedding date (YYYY-MM-DD)');
+            if (!date) return;
+            submitRequest('Marriage', { applicantName: state.family.name, fianceName: fiance, preferredDate: date });
+        }
+
+        async function submitRequest(type, data) {
+            const allReqs = await getSheetData('ServiceRequests');
+            const newId = Math.max(...allReqs.map(r=>Number(r.id)),0)+1;
+            await appendRow('ServiceRequests', {
+                id: newId,
+                familyId: state.family.id,
+                type: type,
+                data: JSON.stringify(data),
+                status: 'Pending',
+                submittedAt: new Date().toISOString().split('T')[0],
+                submittedBy: 'Family Portal',
+                memberId: ''
+            });
+            alert('Request sent to priest');
+        }
+
+        function logout() { window.location.href = 'index.html'; }
+
+        window.openBaptismModal = openBaptismModal;
+        window.openMarriageModal = openMarriageModal;
+        window.editFamily = editFamily;
+        window.logout = logout;
+        initOAuth();
+    </script>
+</body>
+</html>
