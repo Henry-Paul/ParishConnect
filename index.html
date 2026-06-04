@@ -6,8 +6,11 @@
     <title>ParishConnect | Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background: #f1f5f9; }
+        .loader { display: inline-block; width: 20px; height: 20px; border: 2px solid #f3f3f3; border-top: 2px solid #f59e0b; border-radius: 50%; animation: spin 1s linear infinite; margin-left: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -17,16 +20,17 @@
             <h1 class="text-2xl font-bold">ParishConnect</h1>
             <p class="text-slate-500 mb-6">Church Management System</p>
             <div class="space-y-3">
-                <button onclick="redirectWithRole('priest')" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-lg flex items-center justify-center gap-2">
+                <button id="priestBtn" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-lg flex items-center justify-center gap-2">
                     <i data-lucide="shield-check"></i> Parish Priest
                 </button>
-                <button onclick="redirectWithRole('council')" class="w-full py-3 bg-blue-100 hover:bg-blue-200 text-blue-900 font-bold rounded-lg flex items-center justify-center gap-2">
+                <button id="councilBtn" class="w-full py-3 bg-blue-100 hover:bg-blue-200 text-blue-900 font-bold rounded-lg flex items-center justify-center gap-2">
                     <i data-lucide="users"></i> Council Member
                 </button>
-                <button onclick="redirectWithRole('family')" class="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center gap-2">
+                <button id="familyBtn" class="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center gap-2">
                     <i data-lucide="home"></i> Family Portal
                 </button>
             </div>
+            <div id="status" class="mt-4 text-sm text-slate-500"></div>
         </div>
     </div>
 
@@ -34,14 +38,47 @@
         const CLIENT_ID = "706990173660-1ar56n5c3hrvhlabkki9irkng65vpv2p.apps.googleusercontent.com";
         const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 
-        function redirectWithRole(role) {
-            sessionStorage.setItem('parishRole', role);
-            const currentPath = window.location.pathname;
-            const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
-            const redirectUri = window.location.origin + baseDir + 'callback.html';
-            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${SCOPES}&include_granted_scopes=true`;
-            window.location.href = authUrl;
+        let auth2 = null;
+
+        function initGoogleAuth() {
+            gapi.load('auth2', function() {
+                auth2 = gapi.auth2.init({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    ux_mode: 'popup'
+                });
+            });
         }
+
+        function authenticate(role) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Signing in to Google... <span class="loader"></span>';
+            
+            if (!auth2) {
+                statusDiv.innerHTML = 'Loading Google Auth... Please refresh and try again.';
+                return;
+            }
+            
+            auth2.signIn().then(function(googleUser) {
+                const token = googleUser.getAuthResponse().access_token;
+                sessionStorage.setItem('gapi_access_token', token);
+                sessionStorage.setItem('parishRole', role);
+                statusDiv.innerHTML = 'Redirecting...';
+                if (role === 'priest') window.location.href = 'priest.html';
+                else if (role === 'council') window.location.href = 'council.html';
+                else if (role === 'family') window.location.href = 'family.html';
+            }).catch(function(error) {
+                console.error(error);
+                statusDiv.innerHTML = 'Login failed: ' + error.error;
+            });
+        }
+
+        document.getElementById('priestBtn').onclick = () => authenticate('priest');
+        document.getElementById('councilBtn').onclick = () => authenticate('council');
+        document.getElementById('familyBtn').onclick = () => authenticate('family');
+
+        initGoogleAuth();
+        lucide.createIcons();
     </script>
 </body>
 </html>
