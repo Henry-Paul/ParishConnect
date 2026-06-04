@@ -16,9 +16,8 @@
     <div id="toast" class="toast hidden"></div>
     <script>
         const SPREADSHEET_ID = "1zP7AE3JXEyVw0RRPHdD9Pj-HTdxtswAHzQhkAttxIsQ";
-        const CLIENT_ID = "706990173660-1ar56n5c3hrvhlabkki9irkng65vpv2p.apps.googleusercontent.com";
         let accessToken = null;
-        let state = { data: { families:[], graves:[], announcements:[], passcodes:[] }, community: null };
+        let state = { data: { families:[], graves:[], announcements:[] }, community: null };
 
         function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'),3000); }
 
@@ -35,37 +34,22 @@
             });
         }
 
-        async function appendRow(sheet, rowData) {
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheet}!A:Z:append?valueInputOption=RAW`;
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ values: [Object.values(rowData)] })
-            });
-            if (!res.ok) throw new Error();
-            return res.json();
-        }
-
         async function loadData() {
-            const [families, graves, announcements, passcodes] = await Promise.all([
-                getSheetData('Families'), getSheetData('Graves'), getSheetData('Announcements'), getSheetData('Passcodes')
+            const [families, graves, announcements] = await Promise.all([
+                getSheetData('Families'), getSheetData('Graves'), getSheetData('Announcements')
             ]);
-            state.data = { families, graves, announcements, passcodes };
+            state.data = { families, graves, announcements };
             if (state.community) state.data.families = families.filter(f => f.community === state.community);
         }
 
-        async function initOAuth() {
-            const hash = window.location.hash.substring(1);
-            const params = new URLSearchParams(hash);
-            const token = params.get('access_token');
-            if (token) {
-                accessToken = token;
-                window.history.replaceState({}, document.title, window.location.pathname);
+        async function init() {
+            const token = sessionStorage.getItem('gapi_access_token');
+            if (!token) { window.location.href = 'index.html'; return; }
+            accessToken = token;
+            try {
                 await loadData();
                 renderDashboard();
-            } else {
-                window.location.href = 'index.html';
-            }
+            } catch(e) { showToast('Auth error'); window.location.href = 'index.html'; }
         }
 
         function renderDashboard() {
@@ -108,11 +92,11 @@
         }
 
         function escapeHtml(str) { return str.replace(/[&<>]/g, function(m){if(m==='&')return '&amp;';if(m==='<')return '&lt;';if(m==='>')return '&gt;';return m;}); }
-        function logout() { window.location.href = 'index.html'; }
+        function logout() { sessionStorage.clear(); window.location.href = 'index.html'; }
 
         window.showSection = showSection;
         window.logout = logout;
-        initOAuth();
+        init();
     </script>
 </body>
 </html>
