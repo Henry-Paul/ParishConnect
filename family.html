@@ -13,7 +13,6 @@
 
     <script>
         const SPREADSHEET_ID = "1zP7AE3JXEyVw0RRPHdD9Pj-HTdxtswAHzQhkAttxIsQ";
-        const CLIENT_ID = "706990173660-1ar56n5c3hrvhlabkki9irkng65vpv2p.apps.googleusercontent.com";
         let accessToken = null;
         let state = { family: null, members: [], payments: {}, graves: [], announcements: [] };
 
@@ -54,22 +53,17 @@
             state.announcements = announcements.sort((a,b)=>new Date(b.date)-new Date(a.date));
         }
 
-        async function initOAuth() {
+        async function init() {
             const urlParams = new URLSearchParams(window.location.search);
             const familyId = urlParams.get('familyId');
             if (!familyId) { window.location.href = 'index.html'; return; }
-            const hash = window.location.hash.substring(1);
-            const params = new URLSearchParams(hash);
-            const token = params.get('access_token');
-            if (token) {
-                accessToken = token;
-                window.history.replaceState({}, document.title, window.location.pathname);
+            const token = sessionStorage.getItem('gapi_access_token');
+            if (!token) { window.location.href = 'index.html'; return; }
+            accessToken = token;
+            try {
                 await loadData(Number(familyId));
                 renderDashboard();
-            } else {
-                // Redirect to index for login
-                window.location.href = 'index.html';
-            }
+            } catch(e) { showToast('Error loading data'); window.location.href = 'index.html'; }
         }
 
         function renderDashboard() {
@@ -95,7 +89,6 @@
             let addr = prompt('New address', state.family.address);
             let phone = prompt('New phone', state.family.phone);
             if (addr || phone) {
-                // Update the family row
                 const families = await getSheetData('Families');
                 const idx = families.findIndex(f => Number(f.id) === state.family.id);
                 if (idx !== -1) {
@@ -146,13 +139,13 @@
             alert('Request sent to priest');
         }
 
-        function logout() { window.location.href = 'index.html'; }
+        function logout() { sessionStorage.clear(); window.location.href = 'index.html'; }
 
         window.openBaptismModal = openBaptismModal;
         window.openMarriageModal = openMarriageModal;
         window.editFamily = editFamily;
         window.logout = logout;
-        initOAuth();
+        init();
     </script>
 </body>
 </html>
