@@ -36,14 +36,9 @@
 
         function redirectWithRole(role) {
             sessionStorage.setItem('parishRole', role);
-            
-            // Build the full redirect URI using the current page's base path
-            const currentPath = window.location.pathname; // e.g., "/ParishConnect/index.html"
-            const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1); // "/ParishConnect/"
-            const redirectUri = window.location.origin + baseDir + role + '.html';
-            
-            console.log("Redirect URI:", redirectUri); // Check the console to verify
-            
+            const currentPath = window.location.pathname;
+            const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+            const redirectUri = window.location.origin + baseDir + 'callback.html';
             const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${SCOPES}&include_granted_scopes=true`;
             window.location.href = authUrl;
         }
