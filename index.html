@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParishConnect | Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #f1f5f9; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; z-index: 1000; }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+            <i data-lucide="church" class="text-amber-400 w-12 h-12 mx-auto mb-4"></i>
+            <h1 class="text-2xl font-bold">ParishConnect</h1>
+            <p class="text-slate-500 mb-6">Church Management System</p>
+            <div class="space-y-3">
+                <button onclick="redirectWithRole('priest')" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-lg flex items-center justify-center gap-2">
+                    <i data-lucide="shield-check"></i> Parish Priest
+                </button>
+                <button onclick="redirectWithRole('council')" class="w-full py-3 bg-blue-100 hover:bg-blue-200 text-blue-900 font-bold rounded-lg flex items-center justify-center gap-2">
+                    <i data-lucide="users"></i> Council Member
+                </button>
+                <button onclick="redirectWithRole('family')" class="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center gap-2">
+                    <i data-lucide="home"></i> Family Portal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CLIENT_ID = "706990173660-1ar56n5c3hrvhlabkki9irkng65vpv2p.apps.googleusercontent.com";
+        const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
+
+        function redirectWithRole(role) {
+            // Store the role in sessionStorage, then start OAuth flow
+            sessionStorage.setItem('parishRole', role);
+            // Use Google's OAuth to get token, then redirect to dashboard
+            const redirectUri = window.location.origin + `/${role}.html`;
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&redirect_uri=${redirectUri}&response_type=token&scope=${SCOPES}&include_granted_scopes=true`;
+            window.location.href = authUrl;
+        }
+    </script>
+</body>
+</html>
