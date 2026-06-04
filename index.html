@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ParishConnect | Complete Parish CRM</title>
+
+    <!-- Tailwind + Lucide + Google Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #f1f5f9; }
+        .fade-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .slide-in { animation: slideIn 0.25s ease-out; }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
+        .interactive-row { transition: all 0.2s; cursor: pointer; }
+        .interactive-row:hover { transform: translateX(4px); background: #f8fafc; border-left-color: #f59e0b; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; z-index: 1000; transition: opacity 0.3s; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <!-- ==================== LOGIN VIEW ==================== -->
+    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden fade-in">
+            <div class="bg-slate-900 p-8 text-center">
+                <i data-lucide="church" class="text-amber-400 mx-auto mb-4 w-12 h-12"></i>
+                <h1 class="text-2xl font-bold text-white">ParishConnect</h1>
+                <p class="text-slate-400 mt-2">Complete Parish Management System</p>
+            </div>
+            <div class="p-8 space-y-4">
+                <!-- Priest Login -->
+                <button onclick="showPriestLogin()" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-lg flex items-center justify-center gap-2 transition">
+                    <i data-lucide="shield-check"></i> Parish Priest Login
+                </button>
+                <div id="priest-input" class="hidden"><div class="flex gap-2 mt-2"><input id="priest-code" type="password" placeholder="Priest Passcode" class="flex-1 border rounded-lg p-3"><button onclick="loginAsPriest()" class="bg-amber-500 px-6 rounded-lg font-bold">Go</button></div></div>
+
+                <!-- Council Login -->
+                <button onclick="showCouncilLogin()" class="w-full py-3 bg-blue-100 hover:bg-blue-200 text-blue-900 font-bold rounded-lg flex items-center justify-center gap-2 transition">
+                    <i data-lucide="users"></i> Council Member Login
+                </button>
+                <div id="council-input" class="hidden"><div class="flex gap-2 mt-2"><input id="council-code" type="password" placeholder="Council Passcode" class="flex-1 border rounded-lg p-3"><button onclick="loginAsCouncil()" class="bg-blue-600 px-6 rounded-lg text-white font-bold">Go</button></div></div>
+
+                <div class="relative my-4"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div><div class="relative flex justify-center text-sm"><span class="px-2 bg-white text-slate-400">or</span></div></div>
+
+                <!-- Family Login -->
+                <div><label class="block text-sm font-medium text-slate-700">Family Card Number</label><input id="family-card" type="text" placeholder="e.g., FC-101" class="w-full border rounded-lg p-3 mt-1"></div>
+                <div><label class="block text-sm font-medium text-slate-700">Family Passcode</label><input id="family-pass" type="password" placeholder="Family Passcode" class="w-full border rounded-lg p-3 mt-1"></div>
+                <button onclick="loginAsFamily()" class="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg transition">Access Family Portal</button>
+
+                <div id="login-error" class="text-red-600 text-sm text-center hidden p-2 bg-red-50 rounded-lg"></div>
+                <div id="login-loading" class="hidden flex justify-center"><div class="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APP ==================== -->
+    <div id="main-app" class="hidden min-h-screen flex flex-col md:flex-row fade-in">
+        <!-- Sidebar -->
+        <aside class="w-full md:w-64 bg-slate-900 text-white flex flex-col sticky top-0 h-screen overflow-y-auto">
+            <div class="p-6 flex items-center gap-3 border-b border-slate-700">
+                <i data-lucide="church" class="text-amber-400 w-7 h-7"></i>
+                <h1 class="text-xl font-bold">ParishConnect</h1>
+            </div>
+            <nav id="sidebar-nav" class="flex-1 p-4 space-y-2"></nav>
+            <div class="p-4 border-t border-slate-700">
+                <div class="mb-4 px-2 text-sm text-slate-400">Logged in as:<br><span id="user-name" class="font-semibold text-white"></span></div>
+                <button onclick="logout()" class="flex items-center gap-2 w-full p-2 rounded hover:bg-slate-800 text-red-400 transition"><i data-lucide="log-out"></i> Logout</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 p-4 md:p-8 min-w-0 overflow-y-auto">
+            <div id="view-loading" class="hidden flex justify-center py-12"><div class="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div></div>
+            <div id="view-content"></div>
+        </main>
+    </div>
+
+    <!-- ==================== MODALS ==================== -->
+    <div id="modal-add-member" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-2xl w-full max-w-md"><div class="p-5 border-b font-bold text-xl flex justify-between"><span>Add Family Member</span><button onclick="closeModal('add-member')"><i data-lucide="x"></i></button></div><div class="p-6 space-y-4"><input id="member-name" placeholder="Full Name" class="w-full p-3 border rounded-lg"><input id="member-relation" placeholder="Relation to Head" class="w-full p-3 border rounded-lg"><input id="member-dob" type="date" class="w-full p-3 border rounded-lg"><label class="flex items-center gap-2"><input id="member-earning" type="checkbox"> Is Earning?</label><label class="flex items-center gap-2"><input id="member-deceased" type="checkbox"> Deceased?</label></div><div class="p-5 bg-slate-50 flex justify-end gap-3"><button onclick="closeModal('add-member')" class="px-4 py-2 rounded-lg hover:bg-slate-200">Cancel</button><button onclick="saveMember()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button></div></div></div>
+
+    <div id="modal-edit-family" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-2xl w-full max-w-md"><div class="p-5 border-b font-bold text-xl flex justify-between"><span>Edit Family</span><button onclick="closeModal('edit-family')"><i data-lucide="x"></i></button></div><div class="p-6 space-y-4"><input id="edit-fam-name" placeholder="Family Name" class="w-full p-3 border rounded-lg"><textarea id="edit-fam-address" placeholder="Address" rows="3" class="w-full p-3 border rounded-lg"></textarea><input id="edit-fam-phone" placeholder="Phone" class="w-full p-3 border rounded-lg"></div><div class="p-5 bg-slate-50 flex justify-end gap-3"><button onclick="closeModal('edit-family')" class="px-4 py-2 rounded-lg hover:bg-slate-200">Cancel</button><button onclick="updateFamily()" class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600">Update</button></div></div></div>
+
+    <div id="modal-baptism" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-2xl w-full max-w-md"><div class="p-5 border-b font-bold text-xl flex justify-between"><span>Book Baptism</span><button onclick="closeModal('baptism')"><i data-lucide="x"></i></button></div><div class="p-6 space-y-4"><input id="bapt-child" placeholder="Child's Name" class="w-full p-3 border rounded-lg"><input id="bapt-dob" type="date" class="w-full p-3 border rounded-lg"><input id="bapt-date" type="date" class="w-full p-3 border rounded-lg"></div><div class="p-5 bg-slate-50 flex justify-end gap-3"><button onclick="closeModal('baptism')" class="px-4 py-2 rounded-lg hover:bg-slate-200">Cancel</button><button onclick="submitBaptism()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Request</button></div></div></div>
+
+    <div id="modal-marriage" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-2xl w-full max-w-md"><div class="p-5 border-b font-bold text-xl flex justify-between"><span>Register Marriage</span><button onclick="closeModal('marriage')"><i data-lucide="x"></i></button></div><div class="p-6 space-y-4"><input id="marriage-applicant" placeholder="Applicant Name" readonly class="w-full p-3 border rounded-lg bg-slate-100"><input id="marriage-fiance" placeholder="Fiancé(e) Name" class="w-full p-3 border rounded-lg"><input id="marriage-date" type="date" class="w-full p-3 border rounded-lg"></div><div class="p-5 bg-slate-50 flex justify-end gap-3"><button onclick="closeModal('marriage')" class="px-4 py-2 rounded-lg hover:bg-slate-200">Cancel</button><button onclick="submitMarriage()" class="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700">Submit</button></div></div></div>
+
+    <div id="modal-choir" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-2xl w-full max-w-md"><div class="p-5 border-b font-bold text-xl flex justify-between"><span>Choir Skills</span><button onclick="closeModal('choir')"><i data-lucide="x"></i></button></div><div class="p-6 space-y-4"><p class="font-medium" id="choir-member-name"></p><div class="grid grid-cols-2 gap-2"><label><input type="checkbox" value="Singer" class="choir-skill"> Singer</label><label><input type="checkbox" value="Guitarist" class="choir-skill"> Guitarist</label><label><input type="checkbox" value="Pianist" class="choir-skill"> Pianist</label><label><input type="checkbox" value="Drummer" class="choir-skill"> Drummer</label></div></div><div class="p-5 bg-slate-50 flex justify-end gap-3"><button onclick="closeModal('choir')" class="px-4 py-2 rounded-lg hover:bg-slate-200">Cancel</button><button onclick="updateChoir()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save</button></div></div></div>
+
+    <div id="modal-deceased" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-2xl w-full max-w-md"><div class="p-5 border-b font-bold text-xl flex justify-between"><span>Report Deceased</span><button onclick="closeModal('deceased')"><i data-lucide="x"></i></button></div><div class="p-6 space-y-4"><p class="text-sm text-slate-600">Submit request to update member status.</p><input id="deceased-member-name" readonly class="w-full p-3 border rounded-lg bg-slate-100"><input id="deceased-date" type="date" class="w-full p-3 border rounded-lg"></div><div class="p-5 bg-slate-50 flex justify-end gap-3"><button onclick="closeModal('deceased')" class="px-4 py-2 rounded-lg hover:bg-slate-200">Cancel</button><button onclick="submitDeceased()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Send Request</button></div></div></div>
+
+    <div id="modal-profile" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto"><div class="bg-white rounded-2xl w-full max-w-2xl my-8"><div class="p-5 border-b bg-slate-900 text-white flex justify-between items-center rounded-t-2xl"><h3 class="font-bold text-xl flex gap-2 items-center"><i data-lucide="shield" class="text-amber-400"></i> Spiritual Profile</h3><button onclick="closeModal('profile')"><i data-lucide="x"></i></button></div><div class="p-6"><div class="flex flex-col md:flex-row gap-6 items-center md:items-start"><img id="profile-img" src="" class="w-24 h-24 rounded-full border-4 shadow-sm object-cover"><div><h2 id="profile-name" class="text-2xl font-bold"></h2><p id="profile-relation" class="text-sm text-slate-500"></p><div class="mt-2 space-x-2"><span id="profile-age" class="text-xs bg-slate-100 px-2 py-1 rounded-full"></span><span id="profile-earning" class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full hidden">Earning</span><span id="profile-deceased" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full hidden">Deceased</span></div></div><div id="profile-council-actions" class="hidden"><button onclick="reportDeceasedFromProfile()" class="border border-red-200 text-red-600 px-4 py-2 rounded-lg hover:bg-red-50 flex gap-2"><i data-lucide="alert-triangle"></i> Report Deceased</button></div></div><div class="grid md:grid-cols-2 gap-6 mt-6"><div><h4 class="font-bold border-b pb-2 flex gap-2"><i data-lucide="bookmark"></i> Sacraments</h4><ul id="profile-sacraments" class="mt-4 space-y-2 text-sm"></ul></div><div><h4 class="font-bold border-b pb-2 flex gap-2"><i data-lucide="book-open"></i> Catechism</h4><div id="profile-catechism" class="mt-4"></div></div></div><div id="profile-scholarship" class="mt-4 hidden bg-amber-50 p-3 rounded-lg text-amber-800 text-sm"></div><div id="marriage-btn" class="mt-6 hidden"><button onclick="openMarriageFromProfile()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Apply for Marriage Preparation</button></div></div></div></div>
+
+    <div id="modal-announcement" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-2xl w-full max-w-md"><div class="p-5 border-b font-bold text-xl flex justify-between"><span>New Announcement</span><button onclick="closeModal('announcement')"><i data-lucide="x"></i></button></div><div class="p-6 space-y-4"><input id="announce-title" placeholder="Title" class="w-full p-3 border rounded-lg"><textarea id="announce-content" rows="3" placeholder="Message" class="w-full p-3 border rounded-lg"></textarea><div class="flex gap-3"><input type="datetime-local" id="announce-date" class="flex-1 p-3 border rounded-lg"><select id="announce-type" class="flex-1 p-3 border rounded-lg"><option value="General">📢 General</option><option value="Mass">⛪ Mass</option><option value="Event">🎉 Event</option><option value="Urgent">⚠️ Urgent</option></select></div></div><div class="p-5 bg-slate-50 flex justify-end gap-3"><button onclick="closeModal('announcement')" class="px-4 py-2 rounded-lg hover:bg-slate-200">Cancel</button><button onclick="publishAnnouncement()" class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600">Publish</button></div></div></div>
+
+    <div id="toast-message" class="toast hidden"></div>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const SHEETBEST_SHEET_ID = "1M4AxW0I4fycc5ChT0aoWnTiCKxOmW7i6L24cbQjTwDk"; // Your sheet ID
+        const API_BASE = `https://api.sheetbest.com/sheets/${SHEETBEST_SHEET_ID}`;
+        const TABS = {
+            FAMILIES: 'Families', MEMBERS: 'Members', GRAVES: 'Graves', PAYMENTS: 'Payments',
+            REQUESTS: 'ServiceRequests', CHOIR: 'ChoirActivities', PASSCODES: 'Passcodes', ANNOUNCEMENTS: 'Announcements'
+        };
+
+        // Global state
+        let state = {
+            role: null, family: null, councilCommunity: null, selectedFamilyId: null, selectedMemberId: null,
+            activeTab: 'dashboard', loading: false, search: '',
+            data: { families: [], members: [], graves: [], payments: [], requests: [], choir: [], passcodes: [], announcements: [] }
+        };
+
+        // Helper functions
+        function showToast(msg) { const toast = document.getElementById('toast-message'); toast.textContent = msg; toast.classList.remove('hidden'); setTimeout(() => toast.classList.add('hidden'), 3000); }
+        function closeModal(id) { document.getElementById(`modal-${id}`).classList.add('hidden'); }
+        function openModal(id) { document.getElementById(`modal-${id}`).classList.remove('hidden'); lucide.createIcons(); }
+        function parseJSON(str) { if (!str) return null; try { return JSON.parse(str); } catch(e) { return str; } }
+        function stringifyJSON(obj) { return obj ? JSON.stringify(obj) : ''; }
+
+        // API Calls
+        async function fetchTab(tab) { const res = await fetch(`${API_BASE}?tab=${tab}`); if (!res.ok) throw new Error(`SheetBest error ${res.status}`); return res.json(); }
+        async function appendRow(tab, data) { const res = await fetch(`${API_BASE}?tab=${tab}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!res.ok) throw new Error(`Append failed`); return res.json(); }
+        async function updateRow(tab, rowId, data) { const res = await fetch(`${API_BASE}?tab=${tab}&rowId=${rowId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!res.ok) throw new Error(`Update failed`); return res.json(); }
+        async function deleteRow(tab, rowId) { const res = await fetch(`${API_BASE}?tab=${tab}&rowId=${rowId}`, { method: 'DELETE' }); if (!res.ok) throw new Error(`Delete failed`); return res.json(); }
+
+        async function loadAllData() {
+            state.loading = true; updateUI();
+            try {
+                const [families, members, graves, payments, requests, choir, passcodes, announcements] = await Promise.all([
+                    fetchTab(TABS.FAMILIES), fetchTab(TABS.MEMBERS), fetchTab(TABS.GRAVES), fetchTab(TABS.PAYMENTS),
+                    fetchTab(TABS.REQUESTS), fetchTab(TABS.CHOIR), fetchTab(TABS.PASSCODES), fetchTab(TABS.ANNOUNCEMENTS)
+                ]);
+                state.data = { families, members, graves, payments, requests, choir, passcodes, announcements };
+                // Normalize
+                state.data.families = families.map(f => ({ ...f, id: Number(f.id) }));
+                state.data.members = members.map(m => ({ ...m, id: Number(m.id), familyId: Number(m.familyId), isDeceased: m.isDeceased === 'True' || m.isDeceased === true, isEarning: m.isEarning === 'True' || m.isEarning === true, sacraments: parseJSON(m.sacraments), catechism: parseJSON(m.catechism) || [], choir: parseJSON(m.choir) || { active: false, roles: [] } }));
+                state.data.graves = graves.map(g => ({ ...g, familyId: Number(g.familyId), buriedMemberIds: parseJSON(g.buriedMemberIds) || [] }));
+                state.data.payments = payments.map(p => ({ ...p, familyId: Number(p.familyId), year: Number(p.year), months: parseJSON(p.months) || {} }));
+                state.data.requests = requests.map(r => ({ ...r, id: Number(r.id), familyId: Number(r.familyId), data: parseJSON(r.data) }));
+                state.data.choir = choir;
+                state.data.passcodes = passcodes;
+                state.data.announcements = announcements.sort((a,b) => new Date(b.date) - new Date(a.date));
+            } catch(e) { console.error(e); showToast('Failed to load data'); }
+            state.loading = false; updateUI();
+        }
+
+        // ==================== AUTH ====================
+        async function loginAsPriest() {
+            const code = document.getElementById('priest-code').value.trim();
+            if (!code) return showToast('Enter passcode');
+            await loadAllData();
+            const match = state.data.passcodes.find(p => p.role === 'priest' && p.code === code);
+            if (!match) return showToast('Invalid priest code');
+            state.role = 'admin'; state.family = null; state.councilCommunity = null; state.activeTab = 'dashboard';
+            updateUI();
+        }
+        async function loginAsCouncil() {
+            const code = document.getElementById('council-code').value.trim();
+            if (!code) return showToast('Enter passcode');
+            await loadAllData();
+            const match = state.data.passcodes.find(p => p.role === 'council' && p.code === code);
+            if (!match) return showToast('Invalid council code');
+            state.role = 'council'; state.councilCommunity = match.community || null; state.activeTab = 'dashboard';
+            updateUI();
+        }
+        async function loginAsFamily() {
+            const card = document.getElementById('family-card').value.trim().toUpperCase();
+            const pass = document.getElementById('family-pass').value.trim();
+            if (!card || !pass) return showToast('Enter card number and passcode');
+            await loadAllData();
+            const match = state.data.passcodes.find(p => p.role === 'family' && p.code === pass && p.community === card);
+            if (!match) return showToast('Invalid family credentials');
+            const family = state.data.families.find(f => f.cardNo === card);
+            if (!family) return showToast('Family not found');
+            state.role = 'family'; state.family = family; state.selectedFamilyId = family.id; state.activeTab = 'family-detail';
+            updateUI();
+        }
+        function logout() { state.role = null; state.family = null; state.data = { families:[], members:[], graves:[], payments:[], requests:[], choir:[], passcodes:[], announcements:[] }; document.getElementById('main-app').classList.add('hidden'); document.getElementById('login-view').classList.remove('hidden'); location.reload(); }
+        function showPriestLogin() { document.getElementById('priest-input').classList.toggle('hidden'); document.getElementById('council-input').classList.add('hidden'); }
+        function showCouncilLogin() { document.getElementById('council-input').classList.toggle('hidden'); document.getElementById('priest-input').classList.add('hidden'); }
+
+        // ==================== UI RENDERING ====================
+        function updateUI() {
+            if (!state.role) { document.getElementById('login-view').classList.remove('hidden'); document.getElementById('main-app').classList.add('hidden'); return; }
+            document.getElementById('login-view').classList.add('hidden'); document.getElementById('main-app').classList.remove('hidden');
+            document.getElementById('user-name').innerText = state.role === 'admin' ? 'Parish Priest' : (state.role === 'council' ? 'Council Member' : state.family?.name);
+            renderSidebar(); renderContent(); lucide.createIcons();
+        }
+        function renderSidebar() {
+            const nav = document.getElementById('sidebar-nav'); let html = '';
+            if (state.role === 'admin') {
+                html = `<button onclick="switchTab('dashboard')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='dashboard'?'bg-amber-500 text-slate-900 font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="layout-dashboard"></i> Dashboard</button>
+                        <button onclick="switchTab('directory')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='directory'?'bg-amber-500 text-slate-900 font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="users"></i> Directory</button>
+                        <button onclick="switchTab('financials')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='financials'?'bg-amber-500 text-slate-900 font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="credit-card"></i> Financials</button>
+                        <button onclick="switchTab('graves')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='graves'?'bg-amber-500 text-slate-900 font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="map-pin"></i> Graves</button>
+                        <button onclick="switchTab('requests')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='requests'?'bg-amber-500 text-slate-900 font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="bell"></i> Requests</button>
+                        <button onclick="switchTab('choir')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='choir'?'bg-amber-500 text-slate-900 font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="music"></i> Choir</button>
+                        <button onclick="switchTab('announcements')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='announcements'?'bg-amber-500 text-slate-900 font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="megaphone"></i> Announcements</button>`;
+            } else if (state.role === 'council') {
+                html = `<button onclick="switchTab('dashboard')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='dashboard'?'bg-blue-500 text-white font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="users"></i> Community</button>
+                        <button onclick="switchTab('graves')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='graves'?'bg-blue-500 text-white font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="map-pin"></i> Graves</button>
+                        <button onclick="switchTab('announcements')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='announcements'?'bg-blue-500 text-white font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="megaphone"></i> Announcements</button>`;
+            } else {
+                html = `<button onclick="switchTab('family-detail')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='family-detail'?'bg-emerald-500 text-white font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="home"></i> My Family</button>
+                        <button onclick="switchTab('announcements')" class="flex gap-3 p-3 rounded-lg w-full ${state.activeTab==='announcements'?'bg-emerald-500 text-white font-bold':'text-slate-300 hover:bg-slate-800'}"><i data-lucide="megaphone"></i> Announcements</button>`;
+            }
+            nav.innerHTML = html;
+        }
+        function switchTab(tab) { state.activeTab = tab; updateUI(); }
+        function renderContent() {
+            if (state.loading) { document.getElementById('view-content').innerHTML = '<div class="flex justify-center py-12"><div class="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div></div>'; return; }
+            const container = document.getElementById('view-content');
+            if (state.activeTab === 'dashboard' && state.role === 'admin') renderAdminDashboard(container);
+            else if (state.activeTab === 'dashboard' && state.role === 'council') renderCouncilDashboard(container);
+            else if (state.activeTab === 'directory') renderDirectory(container);
+            else if (state.activeTab === 'family-detail') renderFamilyDetail(container);
+            else if (state.activeTab === 'financials') renderFinancials(container);
+            else if (state.activeTab === 'graves') renderGraves(container);
+            else if (state.activeTab === 'requests') renderRequests(container);
+            else if (state.activeTab === 'choir') renderChoir(container);
+            else if (state.activeTab === 'announcements') renderAnnouncements(container);
+            else container.innerHTML = '<div class="text-center py-12">Select a menu item</div>';
+        }
+
+        // ==================== DASHBOARDS & VIEWS ====================
+        function renderAdminDashboard(container) {
+            const totalFamilies = state.data.families.length;
+            const totalMembers = state.data.members.length;
+            const activeMembers = state.data.members.filter(m => !m.isDeceased).length;
+            const earning = state.data.members.filter(m => m.isEarning).length;
+            const pendingReqs = state.data.requests.filter(r => r.status === 'Pending').length;
+            container.innerHTML = `<div class="slide-in"><h1 class="text-3xl font-black mb-2">Welcome, Pastor</h1><p class="text-slate-500 mb-8">Complete overview of your parish</p><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><div class="bg-white p-6 rounded-2xl shadow-sm border"><p class="text-slate-500 text-sm">Families</p><p class="text-3xl font-black">${totalFamilies}</p></div><div class="bg-white p-6 rounded-2xl shadow-sm border"><p class="text-slate-500 text-sm">Total Members</p><p class="text-3xl font-black">${totalMembers}</p></div><div class="bg-white p-6 rounded-2xl shadow-sm border"><p class="text-slate-500 text-sm">Active Members</p><p class="text-3xl font-black text-emerald-600">${activeMembers}</p></div><div class="bg-white p-6 rounded-2xl shadow-sm border"><p class="text-slate-500 text-sm">Pending Requests</p><p class="text-3xl font-black text-amber-600">${pendingReqs}</p></div></div><div class="bg-white rounded-2xl shadow-sm border p-6"><h3 class="font-bold text-lg mb-4">Latest Announcements</h3><div id="preview-announcements" class="space-y-2"></div></div></div>`;
+            const previewDiv = container.querySelector('#preview-announcements');
+            if (previewDiv) previewDiv.innerHTML = state.data.announcements.slice(0,3).map(a => `<div class="p-3 bg-slate-50 rounded-lg"><span class="text-xs font-bold ${a.type==='Urgent'?'text-red-600':'text-amber-600'}">${a.type}</span><p class="font-medium">${a.title}</p><p class="text-xs text-slate-400">${new Date(a.date).toLocaleString()}</p></div>`).join('');
+        }
+        function renderCouncilDashboard(container) {
+            let families = state.data.families;
+            if (state.councilCommunity) families = families.filter(f => f.community === state.councilCommunity);
+            container.innerHTML = `<div class="slide-in"><h1 class="text-2xl font-bold mb-4">Community Directory</h1><div class="grid md:grid-cols-2 gap-4">${families.map(f => `<div class="bg-white p-5 rounded-2xl shadow-sm border"><h3 class="font-bold">${f.name}</h3><p class="text-sm text-slate-500">${f.cardNo}</p><p class="text-sm mt-2">${f.address}</p></div>`).join('')}</div></div>`;
+        }
+        function renderDirectory(container) {
+            const filtered = state.data.families.filter(f => f.name.toLowerCase().includes(state.search.toLowerCase()) || f.cardNo.toLowerCase().includes(state.search.toLowerCase()));
+            container.innerHTML = `<div class="slide-in"><div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-black">Parish Directory</h2><input type="text" placeholder="Search..." class="border rounded-lg px-4 py-2" onkeyup="state.search=this.value; renderDirectory()"></div><div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5">${filtered.map(f => `<div onclick="selectFamily(${f.id})" class="bg-white p-5 rounded-2xl shadow-sm border cursor-pointer hover:shadow-md transition"><p class="text-xs text-amber-600 font-bold">${f.cardNo}</p><h3 class="font-bold text-lg">${f.name}</h3><p class="text-sm text-slate-500">${f.address}</p></div>`).join('')}</div></div>`;
+        }
+        function selectFamily(id) { state.selectedFamilyId = id; state.activeTab = 'family-detail'; updateUI(); }
+        function renderFamilyDetail(container) {
+            const family = state.data.families.find(f => f.id === state.selectedFamilyId);
+            if (!family) { container.innerHTML = '<div class="text-center py-12">Family not found</div>'; return; }
+            const members = state.data.members.filter(m => m.familyId === family.id);
+            const payments = state.data.payments.find(p => p.familyId === family.id && p.year === 2026) || { months: {} };
+            const graves = state.data.graves.filter(g => g.familyId === family.id);
+            container.innerHTML = `<div class="slide-in"><button onclick="switchTab('directory')" class="text-amber-600 mb-4 flex gap-1 items-center">&larr; Back</button><div class="bg-white rounded-2xl shadow-sm border p-6 mb-6"><h2 class="text-2xl font-bold">${family.name}</h2><p>${family.address}</p><p>${family.phone}</p>${state.role==='admin' || state.role==='family' ? `<button onclick="openEditFamily()" class="mt-4 bg-slate-100 px-4 py-2 rounded-lg">Edit</button>` : ''}</div><div class="bg-white rounded-2xl shadow-sm border p-6 mb-6"><h3 class="font-bold text-xl mb-4">Members</h3><div class="overflow-x-auto"><table class="w-full"><tbody>${members.map(m => `<tr class="border-b interactive-row" onclick="openMemberProfile(${m.id})"><td class="py-3 font-medium">${m.name}<td>${m.relation}<td class="text-right"><span class="px-2 py-1 text-xs rounded-full ${m.isDeceased?'bg-red-100 text-red-700':'bg-green-100 text-green-700'}">${m.isDeceased?'Deceased':'Alive'}</span></tr>`).join('')}</tbody></table></div>${state.role==='admin' ? `<button onclick="openAddMember()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg">+ Add Member</button>` : ''}</div><div class="bg-white rounded-2xl shadow-sm border p-6"><h3 class="font-bold text-xl mb-4">2026 Contributions</h3><div class="grid grid-cols-4 gap-2">${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => `<div onclick="${state.role==='admin'?`togglePayment(${family.id},'${m}')`:''}" class="p-3 text-center rounded-xl border ${payments.months[m] ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200'}">${m}</div>`).join('')}</div></div>${state.role === 'family' ? `<div class="mt-6 flex gap-4"><button onclick="openBaptismModal()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold">Book Baptism</button><button id="family-marriage-btn" class="bg-rose-600 text-white px-6 py-3 rounded-xl font-bold">Apply Marriage</button></div>` : ''}</div>`;
+            if (state.role === 'family') document.getElementById('family-marriage-btn')?.addEventListener('click', () => { const eligible = members.find(m => calculateAge(m.dob) >= 18 && !m.isDeceased && !m.sacraments?.marriage); if(eligible) openMarriageModal(eligible.id); else showToast('No eligible member found'); });
+        }
+        function renderFinancials(container) {
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            container.innerHTML = `<div class="slide-in"><h2 class="text-2xl font-black mb-4">Financial Overview 2026</h2><div class="overflow-x-auto"><table class="w-full bg-white rounded-2xl border"><thead><tr class="bg-slate-900 text-white"><th class="p-4">Family</th>${months.map(m => `<th class="p-4 text-center">${m}</th>`).join('')}</tr></thead><tbody>${state.data.families.map(f => { const p = state.data.payments.find(p=>p.familyId===f.id && p.year===2026)||{months:{}}; return `<tr class="border-b"><td class="p-4 font-bold">${f.name}</td>${months.map(m => `<td class="p-4 text-center"><button onclick="togglePayment(${f.id},'${m}')" class="p-2 rounded-full ${p.months[m]?'bg-emerald-100 text-emerald-600':'bg-slate-100 text-slate-400'}"><i data-lucide="${p.months[m]?'check-circle':'circle'}"></i></button></td>`).join('')}</tr>`; }).join('')}</tbody></table></div></div>`;
+        }
+        function renderGraves(container) {
+            container.innerHTML = `<div class="slide-in"><h2 class="text-2xl font-black mb-4">Graveyard Map</h2><div class="grid md:grid-cols-3 gap-6">${state.data.graves.map(g => { const family = state.data.families.find(f=>f.id===g.familyId); return `<div class="bg-white rounded-2xl shadow-sm border p-5"><p class="text-xs text-slate-500 uppercase">Grave No.</p><p class="text-2xl font-black">${g.graveNo}</p><p class="text-sm mt-2"><span class="font-medium">Family:</span> ${family?.name || 'Unknown'}</p></div>`; }).join('')}</div></div>`;
+        }
+        function renderRequests(container) {
+            container.innerHTML = `<div class="slide-in"><h2 class="text-2xl font-black mb-4">Service Requests</h2><div class="space-y-4">${state.data.requests.map(r => { const family = state.data.families.find(f=>f.id===r.familyId); return `<div class="bg-white rounded-2xl shadow-sm border p-6"><div class="flex justify-between items-start"><div><p class="text-xs text-slate-500">${r.type} • ${r.submittedAt}</p><h3 class="font-bold text-lg">${family?.name}</h3><pre class="text-sm bg-slate-50 p-3 rounded mt-2">${JSON.stringify(r.data,null,2)}</pre></div>${r.status === 'Pending' ? `<div class="flex gap-2"><button onclick="updateRequestStatus(${r.id},'Rejected')" class="px-4 py-2 bg-red-100 text-red-700 rounded-lg">Reject</button><button onclick="updateRequestStatus(${r.id},'Approved')" class="px-4 py-2 bg-green-600 text-white rounded-lg">Approve</button></div>` : `<span class="px-3 py-1 rounded-full text-sm ${r.status==='Approved'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${r.status}</span>`}</div></div>`; }).join('')}</div></div>`;
+        }
+        function renderChoir(container) {
+            const choirMembers = state.data.members.filter(m => m.choir?.active && !m.isDeceased);
+            container.innerHTML = `<div class="slide-in"><h2 class="text-2xl font-black mb-4">Choir Ministry</h2><div class="grid md:grid-cols-2 gap-5">${choirMembers.map(m => `<div class="bg-white rounded-2xl shadow-sm border p-5 flex justify-between items-center"><div><h3 class="font-bold">${m.name}</h3><div class="flex gap-1 mt-1">${(m.choir.roles||[]).map(r=>`<span class="text-xs bg-indigo-100 px-2 py-1 rounded">${r}</span>`).join('')}</div></div><button onclick="openChoirModal(${m.id})" class="text-indigo-600"><i data-lucide="edit-3"></i></button></div>`).join('')}</div></div>`;
+        }
+
+        // ==================== ANNOUNCEMENTS VIEW ====================
+        function renderAnnouncements(container) {
+            const typeColors = { 'General':'bg-blue-100 text-blue-800', 'Mass':'bg-purple-100 text-purple-800', 'Event':'bg-green-100 text-green-800', 'Urgent':'bg-red-100 text-red-800' };
+            const isAdmin = state.role === 'admin';
+            container.innerHTML = `<div class="slide-in"><div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-black">📢 Parish Announcements</h2>${isAdmin ? `<button onclick="openModal('announcement')" class="bg-amber-500 text-slate-900 px-4 py-2 rounded-lg font-bold flex gap-2"><i data-lucide="plus"></i> New Announcement</button>` : ''}</div><div class="space-y-6">${state.data.announcements.length === 0 ? '<div class="bg-white rounded-2xl p-12 text-center text-slate-400">No announcements yet.</div>' : state.data.announcements.map(a => `<div class="bg-white rounded-2xl shadow-md border-l-8 ${a.type==='Urgent'?'border-red-500':'border-amber-400'} p-6"><div class="flex justify-between items-start"><div><span class="inline-block px-3 py-1 rounded-full text-xs font-bold ${typeColors[a.type]||'bg-slate-100'}">${a.type}</span><h3 class="text-xl font-bold mt-2">${escapeHtml(a.title)}</h3></div><div class="text-sm text-slate-400">${new Date(a.date).toLocaleString()}</div></div><p class="mt-3 text-slate-600 whitespace-pre-line">${escapeHtml(a.content)}</p><div class="mt-4 text-xs text-slate-400 flex justify-between items-center"><span>Posted by ${a.createdBy || 'Parish Office'}</span>${isAdmin ? `<button onclick="deleteAnnouncement('${a._rowId}')" class="text-red-500 hover:text-red-700 flex gap-1"><i data-lucide="trash-2" class="w-4 h-4"></i> Delete</button>` : ''}</div></div>`).join('')}</div></div>`;
+            lucide.createIcons();
+        }
+
+        async function deleteAnnouncement(rowId) {
+            if (state.role !== 'admin') return;
+            if (!confirm('Delete this announcement?')) return;
+            try {
+                await deleteRow(TABS.ANNOUNCEMENTS, rowId);
+                await loadAllData();
+                showToast('Announcement deleted');
+                if (state.activeTab === 'announcements') renderAnnouncements(document.getElementById('view-content'));
+                else updateUI();
+            } catch(e) { showToast('Delete failed'); }
+        }
+
+        async function publishAnnouncement() {
+            const title = document.getElementById('announce-title').value.trim();
+            const content = document.getElementById('announce-content').value.trim();
+            const date = document.getElementById('announce-date').value;
+            const type = document.getElementById('announce-type').value;
+            if (!title || !content || !date) { showToast('Please fill all fields'); return; }
+            try {
+                await appendRow(TABS.ANNOUNCEMENTS, {
+                    title, content, date, type,
+                    createdBy: state.role === 'admin' ? 'Priest' : 'Council',
+                    createdAt: new Date().toISOString()
+                });
+                await loadAllData();
+                closeModal('announcement');
+                showToast('Announcement published');
+                if (state.activeTab === 'announcements') renderAnnouncements(document.getElementById('view-content'));
+                else updateUI();
+            } catch(e) { showToast('Failed to publish'); }
+        }
+
+        // ==================== OTHER ACTIONS ====================
+        async function togglePayment(familyId, month) { if (state.role !== 'admin') return; let payment = state.data.payments.find(p => p.familyId === familyId && p.year === 2026); let months = payment ? { ...payment.months } : {}; months[month] = !months[month]; if (payment) { await updateRow('Payments', payment._rowId, { familyId, year: 2026, months: stringifyJSON(months) }); } else { await appendRow('Payments', { familyId, year: 2026, months: stringifyJSON(months) }); } await loadAllData(); updateUI(); }
+        async function updateRequestStatus(id, newStatus) { const req = state.data.requests.find(r => r.id === id); if (!req) return; await updateRow('ServiceRequests', req._rowId, { ...req, status: newStatus }); if (newStatus === 'Approved') { if (req.type === 'Baptism') { const newId = Math.max(...state.data.members.map(m=>m.id),0)+1; await appendRow('Members', { id: newId, familyId: req.familyId, name: req.data.childName, relation: 'Child', dob: req.data.dob, isDeceased: 'False', isEarning: 'False', sacraments: JSON.stringify({ baptism: req.data.preferredDate }), catechism: '[]', scholarship: '', choir: '{"active":false,"roles":[]}' }); } else if (req.type === 'Marriage' && req.memberId) { const member = state.data.members.find(m=>m.id===req.memberId); if (member) { let sacraments = member.sacraments || {}; sacraments.marriage = { date: req.data.preferredDate, to: req.data.fianceName }; await updateRow('Members', member._rowId, { ...member, sacraments: stringifyJSON(sacraments) }); } } else if (req.type === 'DeceasedUpdate' && req.memberId) { const member = state.data.members.find(m=>m.id===req.memberId); if (member) await updateRow('Members', member._rowId, { ...member, isDeceased: 'True' }); } } await loadAllData(); updateUI(); }
+        async function saveMember() { const name = document.getElementById('member-name').value; if(!name) return; const newId = Math.max(...state.data.members.map(m=>m.id),0)+1; await appendRow('Members', { id: newId, familyId: state.selectedFamilyId, name, relation: document.getElementById('member-relation').value, dob: document.getElementById('member-dob').value, isDeceased: document.getElementById('member-deceased').checked ? 'True':'False', isEarning: document.getElementById('member-earning').checked?'True':'False', sacraments: '{}', catechism: '[]', scholarship: '', choir: '{"active":false,"roles":[]}' }); await loadAllData(); closeModal('add-member'); updateUI(); }
+        async function updateFamily() { const fam = state.data.families.find(f=>f.id===state.selectedFamilyId); if(!fam) return; await updateRow('Families', fam._rowId, { ...fam, name: document.getElementById('edit-fam-name').value, address: document.getElementById('edit-fam-address').value, phone: document.getElementById('edit-fam-phone').value }); await loadAllData(); closeModal('edit-family'); updateUI(); }
+        async function submitBaptism() { const child = document.getElementById('bapt-child').value, dob = document.getElementById('bapt-dob').value, pref = document.getElementById('bapt-date').value; if(!child||!dob||!pref) return; const newId = Math.max(...state.data.requests.map(r=>r.id),0)+1; await appendRow('ServiceRequests', { id: newId, familyId: state.selectedFamilyId, type: 'Baptism', data: JSON.stringify({ childName:child, dob, preferredDate:pref }), status: 'Pending', submittedAt: new Date().toISOString().split('T')[0], submittedBy: 'Family Portal', memberId: '' }); await loadAllData(); closeModal('baptism'); showToast('Baptism request sent'); updateUI(); }
+        async function submitMarriage() { const fiance = document.getElementById('marriage-fiance').value, date = document.getElementById('marriage-date').value; if(!fiance||!date) return; const newId = Math.max(...state.data.requests.map(r=>r.id),0)+1; await appendRow('ServiceRequests', { id: newId, familyId: state.selectedFamilyId, type: 'Marriage', data: JSON.stringify({ applicantName: document.getElementById('marriage-applicant').value, fianceName: fiance, preferredDate: date }), status: 'Pending', submittedAt: new Date().toISOString().split('T')[0], submittedBy: 'Family Portal', memberId: state.selectedMemberId }); await loadAllData(); closeModal('marriage'); showToast('Marriage request sent'); updateUI(); }
+        async function openChoirModal(id) { const m = state.data.members.find(m=>m.id===id); if(!m) return; state.selectedMemberId = id; document.getElementById('choir-member-name').innerText = m.name; const roles = m.choir?.roles || []; document.querySelectorAll('.choir-skill').forEach(cb => cb.checked = roles.includes(cb.value)); openModal('choir'); }
+        async function updateChoir() { const member = state.data.members.find(m=>m.id===state.selectedMemberId); if(!member) return; const roles = Array.from(document.querySelectorAll('.choir-skill:checked')).map(cb=>cb.value); const choirObj = { active: roles.length>0, roles }; await updateRow('Members', member._rowId, { ...member, choir: stringifyJSON(choirObj) }); await loadAllData(); closeModal('choir'); updateUI(); }
+        function openMemberProfile(id) { const m = state.data.members.find(m=>m.id===id); if(!m) return; document.getElementById('profile-name').innerText = m.name; document.getElementById('profile-relation').innerText = m.relation; document.getElementById('profile-age').innerText = `${calculateAge(m.dob)||'?'} years`; if(m.isEarning) document.getElementById('profile-earning').classList.remove('hidden'); if(m.isDeceased) document.getElementById('profile-deceased').classList.remove('hidden'); document.getElementById('profile-img').src = `https://ui-avatars.com/api/?name=${m.name.split(' ').map(n=>n[0]).join('')}&background=0f172a&color=fff`; const sac = m.sacraments || {}; document.getElementById('profile-sacraments').innerHTML = `<li>Baptism: ${sac.baptism || 'Not recorded'}</li><li>Communion: ${sac.communion || 'Not recorded'}</li>${sac.marriage ? `<li>Marriage: ${sac.marriage.date} to ${sac.marriage.to}</li>` : ''}`; document.getElementById('profile-catechism').innerHTML = (m.catechism || []).map(c => `<div class="flex justify-between"><span>${c.year}</span><span>${c.attendance}</span></div>`).join(''); if(m.scholarship) document.getElementById('profile-scholarship').innerHTML = m.scholarship; if(state.role === 'council' && !m.isDeceased) document.getElementById('profile-council-actions').classList.remove('hidden'); const age = calculateAge(m.dob); if(age >= 18 && !m.isDeceased && !sac.marriage && state.role === 'family') document.getElementById('marriage-btn').classList.remove('hidden'); openModal('profile'); }
+        function openAddMember() { openModal('add-member'); }
+        function openEditFamily() { const fam = state.data.families.find(f=>f.id===state.selectedFamilyId); if(fam) { document.getElementById('edit-fam-name').value = fam.name; document.getElementById('edit-fam-address').value = fam.address; document.getElementById('edit-fam-phone').value = fam.phone; openModal('edit-family'); } }
+        function openBaptismModal() { openModal('baptism'); }
+        function openMarriageModal(id) { const m = state.data.members.find(m=>m.id===id); if(m) { document.getElementById('marriage-applicant').value = m.name; state.selectedMemberId = id; openModal('marriage'); } }
+        function reportDeceasedFromProfile() { const m = state.data.members.find(m=>m.id===state.selectedMemberId); if(m) { document.getElementById('deceased-member-name').value = m.name; openModal('deceased'); } }
+        async function submitDeceased() { const memberId = state.selectedMemberId; const member = state.data.members.find(m=>m.id===memberId); if(!member) return; const date = document.getElementById('deceased-date').value; const newId = Math.max(...state.data.requests.map(r=>r.id),0)+1; await appendRow('ServiceRequests', { id: newId, familyId: member.familyId, type: 'DeceasedUpdate', data: JSON.stringify({ memberName: member.name, date: date||'Not specified' }), status: 'Pending', submittedAt: new Date().toISOString().split('T')[0], submittedBy: 'Council PCM', memberId: memberId }); await loadAllData(); closeModal('deceased'); showToast('Deceased report sent to priest'); updateUI(); }
+        function calculateAge(dob) { if(!dob) return null; return Math.floor((new Date() - new Date(dob)) / 31556952000); }
+        function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m) { if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m; }); }
+
+        window.onload = () => { lucide.createIcons(); updateUI(); };
+        window.selectFamily = selectFamily; window.togglePayment = togglePayment; window.updateRequestStatus = updateRequestStatus;
+        window.openAddMember = openAddMember; window.openEditFamily = openEditFamily; window.openBaptismModal = openBaptismModal;
+        window.openMarriageModal = openMarriageModal; window.reportDeceasedFromProfile = reportDeceasedFromProfile;
+        window.openChoirModal = openChoirModal; window.saveMember = saveMember; window.updateFamily = updateFamily;
+        window.submitBaptism = submitBaptism; window.submitMarriage = submitMarriage; window.updateChoir = updateChoir;
+        window.submitDeceased = submitDeceased; window.publishAnnouncement = publishAnnouncement; window.deleteAnnouncement = deleteAnnouncement;
+    </script>
+</body>
+</html>
