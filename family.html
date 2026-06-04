@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParishConnect | Family Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-100 font-sans">
+    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+            <i data-lucide="home" class="text-emerald-500 w-12 h-12 mx-auto mb-4"></i>
+            <h1 class="text-2xl font-bold text-center">Family Portal Login</h1>
+            <input id="cardNo" placeholder="Card Number (e.g., FC-101)" class="w-full border rounded-lg p-3 my-2">
+            <input id="passcode" type="password" placeholder="Family Passcode" class="w-full border rounded-lg p-3 my-2">
+            <button onclick="login()" class="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold mt-4">Access</button>
+            <div id="error" class="text-red-600 text-sm mt-2 text-center hidden"></div>
+        </div>
+    </div>
+
+    <div id="dashboard" class="hidden">
+        <div class="bg-white shadow-sm border-b p-4 flex justify-between items-center">
+            <div class="flex items-center gap-3"><i data-lucide="church" class="text-amber-500"></i><h1 class="text-xl font-bold">ParishConnect</h1><span class="text-sm text-slate-500">Family Portal</span></div>
+            <button onclick="logout()" class="text-red-500 flex gap-2"><i data-lucide="log-out"></i> Logout</button>
+        </div>
+        <main class="p-6 max-w-5xl mx-auto">
+            <div id="family-detail" class="space-y-6"></div>
+            <div id="announcements" class="mt-8"></div>
+        </main>
+    </div>
+
+    <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white px-4 py-2 rounded-lg hidden"></div>
+
+    <script>
+        const SHEETBEST_SHEET_ID = "72f7e193-8016-4a6f-bd26-c1e6a24fb028";
+        const API_KEY = "a@2YPYuwhf#5_fdfVN2rY1NJTj9462ZxAewLZUG@ri0AsN%p8c3K2a6p-EhT!hBx";
+        const API_BASE = `https://api.sheetbest.com/sheets/${SHEETBEST_SHEET_ID}`;
+
+        let state = { family: null, members: [], payments: {}, graves: [], announcements: [] };
+
+        async function fetchTab(tab) {
+            const res = await fetch(`${API_BASE}?tab=${tab}`, { headers: { 'X-Api-Key': API_KEY } });
+            if (!res.ok) throw new Error();
+            return res.json();
+        }
+
+        async function appendRow(tab, data) {
+            const res = await fetch(`${API_BASE}?tab=${tab}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) throw new Error();
+            return res.json();
+        }
+
+        async function loadData(familyId) {
+            const [families, members, payments, graves, announcements] = await Promise.all([
+                fetchTab('Families'), fetchTab('Members'), fetchTab('Payments'), fetchTab('Graves'), fetchTab('Announcements')
+            ]);
+            state.family = families.find(f=>Number(f.id)===familyId);
+            state.members = members.filter(m=>Number(m.familyId)===familyId).map(m=>({...m,id:Number(m.id),isDeceased:m.isDeceased==='True',isEarning:m.isEarning==='True',sacraments:JSON.parse(m.sacraments||'{}'),catechism:JSON.parse(m.catechism||'[]')}));
+            state.payments = payments.find(p=>Number(p.familyId)===familyId && Number(p.year)===2026) || { months: {} };
+            state.graves = graves.filter(g=>Number(g.familyId)===familyId);
+            state.announcements = announcements.sort((a,b)=>new Date(b.date)-new Date(a.date));
+        }
+
+        async function login() {
+            const cardNo = document.getElementById('cardNo').value.trim().toUpperCase();
+            const pass = document.getElementById('passcode').value.trim();
+            if(!cardNo||!pass) return;
+            try {
+                const passcodes = await fetchTab('Passcodes');
+                const match = passcodes.find(p=>p.role==='family' && p.code===pass && p.community===cardNo);
+                if(!match) throw new Error('Invalid credentials');
+                const families = await fetchTab('Families');
+                const family = families.find(f=>f.cardNo===cardNo);
+                if(!family) throw new Error('Family not found');
+                await loadData(Number(family.id));
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                renderDashboard();
+                lucide.createIcons();
+            } catch(e) {
+                document.getElementById('error').innerText = e.message || 'Login failed. Check SheetBest connection.';
+                document.getElementById('error').classList.remove('hidden');
+            }
+        }
+
+        function logout() { location.reload(); }
+
+        function renderDashboard() {
+            const container = document.getElementById('family-detail');
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            container.innerHTML = `
+                <div class="bg-white rounded-2xl shadow p-6"><h2 class="text-2xl font-bold">${state.family.name}</h2><p>${state.family.address}</p><p>${state.family.phone}</p><button onclick="editFamily()" class="mt-4 bg-slate-100 px-4 py-2 rounded">Edit Info</button></div>
+                <div class="bg-white rounded-2xl shadow p-6"><h3 class="font-bold text-xl mb-4">Family Members</h3><table class="w-full"><tbody>${state.members.map(m=>`<tr class="border-b"><td class="py-3 font-medium">${m.name}</td><td>${m.relation}</td><td class="text-right"><span class="px-2 py-1 text-xs rounded-full ${m.isDeceased?'bg-red-100 text-red-700':'bg-green-100 text-green-700'}">${m.isDeceased?'Deceased':'Alive'}</span></td></tr>`).join('')}</tbody>}</table></div>
+                <div class="bg-white rounded-2xl shadow p-6"><h3 class="font-bold text-xl mb-4">2026 Contributions</h3><div class="grid grid-cols-4 gap-2">${months.map(m=>`<div class="p-3 text-center rounded-xl border ${state.payments.months[m]?'bg-emerald-50 border-emerald-200 text-emerald-700':'bg-white border-slate-200'}">${m}</div>`).join('')}</div></div>
+                <div class="bg-white rounded-2xl shadow p-6"><h3 class="font-bold text-xl mb-4">Grave Allocation</h3><div>${state.graves.map(g=>`<p><strong>${g.graveNo}</strong> – ${g.buriedMemberIds?.length||0} buried</p>`).join('')||'None'}</div></div>
+                <div class="flex gap-4 mt-4"><button onclick="openBaptismModal()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold">Book Baptism</button><button onclick="openMarriageModal()" class="bg-rose-600 text-white px-6 py-3 rounded-xl font-bold">Apply Marriage</button></div>
+            `;
+            const announceDiv = document.getElementById('announcements');
+            const typeColors = { General:'bg-blue-100 text-blue-800', Mass:'bg-purple-100 text-purple-800', Event:'bg-green-100 text-green-800', Urgent:'bg-red-100 text-red-800' };
+            announceDiv.innerHTML = `<h3 class="font-bold text-xl mb-2">📢 Parish Announcements</h3><div class="space-y-4">${state.announcements.map(a=>`<div class="bg-white rounded-2xl shadow border-l-8 ${a.type==='Urgent'?'border-red-500':'border-amber-400'} p-4"><div class="flex justify-between"><span class="inline-block px-3 py-1 rounded-full text-xs font-bold ${typeColors[a.type]}">${a.type}</span><span class="text-xs text-slate-400">${new Date(a.date).toLocaleString()}</span></div><h4 class="font-bold mt-2">${a.title}</h4><p class="text-sm text-slate-600">${a.content}</p></div>`).join('')}</div>`;
+        }
+
+        async function editFamily() {
+            let addr = prompt('New address', state.family.address);
+            let phone = prompt('New phone', state.family.phone);
+            if(addr || phone) {
+                const families = await fetchTab('Families');
+                const familyRow = families.find(f=>Number(f.id)===state.family.id);
+                if(familyRow) {
+                    await fetch(`${API_BASE}?tab=Families&rowId=${familyRow._rowId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY },
+                        body: JSON.stringify({...familyRow, address: addr || familyRow.address, phone: phone || familyRow.phone})
+                    });
+                    alert('Family updated');
+                    location.reload();
+                }
+            }
+        }
+
+        function openBaptismModal() {
+            let child = prompt('Child\'s name');
+            if(!child) return;
+            let dob = prompt('Date of birth (YYYY-MM-DD)');
+            if(!dob) return;
+            let date = prompt('Preferred baptism date (YYYY-MM-DD)');
+            if(!date) return;
+            submitRequest('Baptism', {childName: child, dob, preferredDate: date});
+        }
+
+        function openMarriageModal() {
+            let fiance = prompt('Fiancé(e) full name');
+            if(!fiance) return;
+            let date = prompt('Preferred wedding date (YYYY-MM-DD)');
+            if(!date) return;
+            submitRequest('Marriage', {applicantName: state.family.name, fianceName: fiance, preferredDate: date});
+        }
+
+        async function submitRequest(type, data) {
+            const allReqs = await fetchTab('ServiceRequests');
+            const newId = Math.max(...allReqs.map(r=>Number(r.id)),0)+1;
+            await appendRow('ServiceRequests', {
+                id: newId,
+                familyId: state.family.id,
+                type: type,
+                data: JSON.stringify(data),
+                status: 'Pending',
+                submittedAt: new Date().toISOString().split('T')[0],
+                submittedBy: 'Family Portal',
+                memberId: ''
+            });
+            alert('Request sent to priest');
+        }
+
+        window.login=login; window.logout=logout; window.editFamily=editFamily;
+        window.openBaptismModal=openBaptismModal; window.openMarriageModal=openMarriageModal;
+    </script>
+</body>
+</html>
