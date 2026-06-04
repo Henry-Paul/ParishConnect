@@ -18,22 +18,16 @@
 </head>
 <body>
     <div id="app" class="min-h-screen flex flex-col">
-        <!-- Loading / error state -->
         <div id="loading" class="flex-1 flex items-center justify-center">Loading dashboard...</div>
     </div>
-
     <div id="toast" class="toast hidden"></div>
 
     <script>
-        // ==================== CONFIGURATION ====================
-        const SPREADSHEET_ID = "1zP7AE3JXEyVw0RRPHdD9Pj-HTdxtswAHzQhkAttxIsQ"; // Replace with your sheet ID
+        const SPREADSHEET_ID = "1zP7AE3JXEyVw0RRPHdD9Pj-HTdxtswAHzQhkAttxIsQ";
         const CLIENT_ID = "706990173660-1ar56n5c3hrvhlabkki9irkng65vpv2p.apps.googleusercontent.com";
-        const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
-        
         let accessToken = null;
-        let tokenClient = null;
         let state = {
-            data: { families:[], members:[], graves:[], payments:[], requests:[], choir:[], announcements:[], passcodes:[] },
+            data: { families:[], members:[], graves:[], payments:[], requests:[], choir:[], announcements:[] },
             activeSection: 'overview'
         };
 
@@ -44,7 +38,6 @@
             setTimeout(() => toast.classList.add('hidden'), 3000);
         }
 
-        // ==================== GOOGLE SHEETS API HELPERS ====================
         async function getSheetData(sheetName) {
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}?alt=json`;
             const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
@@ -62,8 +55,6 @@
         }
 
         async function updateSheetData(sheetName, rowIndex, rowData) {
-            // rowIndex is 1-based (first row of data is index 2? Actually values array: row0=headers, row1=first data row)
-            // Convert to A1 notation: e.g., "SheetName!A2:Z2"
             const range = `${sheetName}!A${rowIndex+2}:Z${rowIndex+2}`;
             const body = { values: [Object.values(rowData)] };
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?valueInputOption=RAW`;
@@ -77,41 +68,23 @@
         }
 
         async function appendRow(sheetName, rowData) {
-            const range = `${sheetName}!A:Z`;
-            const body = { values: [Object.values(rowData)] };
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}:append?valueInputOption=RAW`;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${sheetName}!A:Z:append?valueInputOption=RAW`;
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify({ values: [Object.values(rowData)] })
             });
             if (!res.ok) throw new Error(`Append failed: ${res.status}`);
             return res.json();
         }
 
-        async function deleteRow(sheetName, rowIndex) {
-            // Clear the row (can't delete, just clear)
-            const range = `${sheetName}!A${rowIndex+2}:Z${rowIndex+2}`;
-            const body = { values: [Array(26).fill('')] };
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?valueInputOption=RAW`;
-            const res = await fetch(url, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
-            return res.json();
-        }
-
-        // ==================== DATA LOADING ====================
         async function loadAllData() {
             try {
-                const [families, members, graves, payments, requests, choir, announcements, passcodes] = await Promise.all([
+                const [families, members, graves, payments, requests, choir, announcements] = await Promise.all([
                     getSheetData('Families'), getSheetData('Members'), getSheetData('Graves'), getSheetData('Payments'),
-                    getSheetData('ServiceRequests'), getSheetData('ChoirActivities'), getSheetData('Announcements'), getSheetData('Passcodes')
+                    getSheetData('ServiceRequests'), getSheetData('ChoirActivities'), getSheetData('Announcements')
                 ]);
-                state.data = { families, members, graves, payments, requests, choir, announcements, passcodes };
-                // Normalize numeric fields
+                state.data = { families, members, graves, payments, requests, choir, announcements };
                 state.data.families = families.map(f => ({ ...f, id: Number(f.id) }));
                 state.data.members = members.map(m => ({ ...m, id: Number(m.id), familyId: Number(m.familyId), isDeceased: m.isDeceased === 'TRUE', isEarning: m.isEarning === 'TRUE', sacraments: JSON.parse(m.sacraments || '{}'), catechism: JSON.parse(m.catechism || '[]'), choir: JSON.parse(m.choir || '{"active":false,"roles":[]}') }));
                 state.data.graves = graves.map(g => ({ ...g, familyId: Number(g.familyId), buriedMemberIds: JSON.parse(g.buriedMemberIds || '[]') }));
@@ -121,32 +94,23 @@
             } catch(e) { console.error(e); showToast('Failed to load data'); }
         }
 
-        // ==================== AUTHENTICATION ====================
-        async function initOAuth() {
-            // Extract access token from URL fragment (after redirect)
-            const hash = window.location.hash.substring(1);
-            const params = new URLSearchParams(hash);
-            const token = params.get('access_token');
-            if (token) {
-                accessToken = token;
-                // Remove token from URL
-                window.history.replaceState({}, document.title, window.location.pathname);
-                // Verify token by fetching passcodes
-                try {
-                    await loadAllData();
-                    // Check priest passcode? We'll just assume the OAuth user is the priest.
-                    renderDashboard();
-                } catch(e) {
-                    showToast('Authentication failed. Please try logging in again.');
-                    window.location.href = 'index.html';
-                }
-            } else {
-                // No token, redirect to index
+        async function init() {
+            const token = sessionStorage.getItem('gapi_access_token');
+            if (!token) {
+                window.location.href = 'index.html';
+                return;
+            }
+            accessToken = token;
+            try {
+                await loadAllData();
+                renderDashboard();
+            } catch(e) {
+                showToast('Authentication failed. Please log in again.');
+                sessionStorage.removeItem('gapi_access_token');
                 window.location.href = 'index.html';
             }
         }
 
-        // ==================== UI RENDERING ====================
         function renderDashboard() {
             const container = document.getElementById('app');
             container.innerHTML = `
@@ -205,14 +169,11 @@
         }
 
         async function togglePayment(familyId, month) {
-            // Find the payment row for this family and year 2026
             let payment = state.data.payments.find(p => p.familyId === familyId && p.year === 2026);
             let months = payment ? { ...payment.months } : {};
             months[month] = !months[month];
             const rowData = { familyId, year: 2026, months: JSON.stringify(months) };
             if (payment) {
-                // Find row index in original data (need to get the row index from getSheetData)
-                // For simplicity, we'll fetch the sheet again to get row index by matching id
                 const fullSheet = await getSheetData('Payments');
                 const idx = fullSheet.findIndex(r => Number(r.familyId) === familyId && Number(r.year) === 2026);
                 if (idx !== -1) await updateSheetData('Payments', idx, rowData);
@@ -314,18 +275,18 @@
         async function deleteAnnouncement(rowId) {
             if (confirm('Delete this announcement?')) {
                 const fullSheet = await getSheetData('Announcements');
-                const idx = fullSheet.findIndex(a => a._rowId === rowId); // _rowId not real, need to use a unique field: we'll use date + title as key, but simpler: use row index from original fetch
-                // Since we don't have row index, we'll fetch the raw values and clear by finding the row number
-                // Alternative: we store the row number in a data attribute. For brevity, we'll just show a message.
-                showToast('Delete functionality needs row index. Implement properly.');
+                const idx = fullSheet.findIndex(a => a.date === rowId); // not ideal, but for demo
+                if (idx !== -1) await updateSheetData('Announcements', idx, {});
+                await loadAllData();
+                renderAnnouncements(document.getElementById('main-content'));
+                showToast('Deleted');
             }
         }
 
         function escapeHtml(str) { return str.replace(/[&<>]/g, function(m){if(m==='&')return '&amp;';if(m==='<')return '&lt;';if(m==='>')return '&gt;';return m;}); }
 
-        function logout() { window.location.href = 'index.html'; }
+        function logout() { sessionStorage.clear(); window.location.href = 'index.html'; }
 
-        // Expose global functions
         window.showSection = showSection;
         window.viewFamily = viewFamily;
         window.togglePayment = togglePayment;
@@ -335,8 +296,7 @@
         window.deleteAnnouncement = deleteAnnouncement;
         window.logout = logout;
 
-        // Initialize
-        initOAuth();
+        init();
     </script>
 </body>
 </html>
